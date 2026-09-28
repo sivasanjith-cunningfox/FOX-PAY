@@ -1,0 +1,1012 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Fox Pay Credits</title>
+<meta name="description" content="Imaginary Fox Credits wallet — send, receive, and top up fictional currency.">
+<meta name="theme-color" content="#FF6A00">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Fox Pay">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  html, body, #root { height: 100%; margin: 0; }
+  body {
+    background:
+      radial-gradient(ellipse at 50% -10%, rgba(255,200,80,0.95), rgba(255,106,0,0.35) 42%, transparent 70%),
+      #FF6A00;
+  }
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+
+const { useState, useEffect, useRef } = React;
+
+/* -------- tiny inline icon set (mirrors the lucide-react icons the design
+   calls for) so the page has zero external icon dependency -------- */
+function Icon({ children, size = 16, color = "currentColor", ...rest }) {
+  return (
+    <svg
+      width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+      {...rest}
+    >
+      {children}
+    </svg>
+  );
+}
+const Send = (p) => <Icon {...p}><line x1="22" y1="2" x2="11" y2="13" /><polygon points="22 2 15 22 11 13 2 9 22 2" /></Icon>;
+const Users = (p) => <Icon {...p}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></Icon>;
+const Building2 = (p) => <Icon {...p}><path d="M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z" /><path d="M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2" /><path d="M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2" /><path d="M10 6h4" /><path d="M10 10h4" /><path d="M10 14h4" /><path d="M10 18h4" /></Icon>;
+const History = (p) => <Icon {...p}><path d="M3 12a9 9 0 1 0 3-6.7L3 8" /><path d="M3 3v5h5" /><path d="M12 7v5l4 2" /></Icon>;
+const Plus = (p) => <Icon {...p}><path d="M5 12h14" /><path d="M12 5v14" /></Icon>;
+const ArrowUpRight = (p) => <Icon {...p}><path d="M7 7h10v10" /><path d="M7 17 17 7" /></Icon>;
+const ArrowDownLeft = (p) => <Icon {...p}><path d="M17 7 7 17" /><path d="M17 17H7V7" /></Icon>;
+const X = (p) => <Icon {...p}><path d="M18 6 6 18" /><path d="m6 6 12 12" /></Icon>;
+const ChevronRight = (p) => <Icon {...p}><path d="m9 18 6-6-6-6" /></Icon>;
+const Zap = (p) => <Icon {...p}><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" /></Icon>;
+const Cpu = (p) => <Icon {...p}><rect x="4" y="4" width="16" height="16" rx="2" /><rect x="9" y="9" width="6" height="6" /><path d="M15 2v2" /><path d="M15 20v2" /><path d="M2 15h2" /><path d="M2 9h2" /><path d="M20 15h2" /><path d="M20 9h2" /><path d="M9 2v2" /><path d="M9 20v2" /></Icon>;
+const Radio = (p) => <Icon {...p}><path d="M4.9 19.1C1 15.2 1 8.8 4.9 4.9" /><path d="M7.8 16.2c-2.3-2.3-2.3-6.1 0-8.5" /><circle cx="12" cy="12" r="2" /><path d="M16.2 7.8c2.3 2.3 2.3 6.1 0 8.5" /><path d="M19.1 4.9C23 8.8 23 15.1 19.1 19" /></Icon>;
+const Crown = (p) => <Icon {...p}><path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7z" /><path d="M5 20h14" /></Icon>;
+const QrIcon = (p) => <Icon {...p}><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /><rect x="14" y="14" width="3" height="3" /><path d="M20 14h1v3" /><path d="M17 20h4" /><path d="M14 17h3v4" /></Icon>;
+
+/* Persist to localStorage in a real browser; fall back to memory if blocked. */
+if (!window.storage) {
+  const _mem = {};
+  const canLS = (() => {
+    try {
+      const k = "__foxpay_test__";
+      localStorage.setItem(k, "1");
+      localStorage.removeItem(k);
+      return true;
+    } catch (e) {
+      return false;
+    }
+  })();
+  window.storage = {
+    async get(key) {
+      if (canLS) {
+        const raw = localStorage.getItem(key);
+        if (raw == null) throw new Error("not found");
+        return { key, value: raw, shared: false };
+      }
+      if (!(key in _mem)) throw new Error("not found");
+      return { key, value: _mem[key], shared: false };
+    },
+    async set(key, value) {
+      if (canLS) localStorage.setItem(key, value);
+      else _mem[key] = value;
+      return { key, value, shared: false };
+    },
+    async delete(key) {
+      const existed = canLS ? localStorage.getItem(key) != null : key in _mem;
+      if (canLS) localStorage.removeItem(key);
+      else delete _mem[key];
+      return { key, deleted: existed, shared: false };
+    },
+    async list(prefix) {
+      const keys = canLS
+        ? Object.keys(localStorage).filter((k) => !prefix || k.startsWith(prefix))
+        : Object.keys(_mem).filter((k) => !prefix || k.startsWith(prefix));
+      return { keys, prefix, shared: false };
+    },
+  };
+}
+
+const FONT_STYLE = `
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500;600;700&display=swap');
+.font-display { font-family: 'Space Grotesk', sans-serif; }
+.font-body { font-family: 'Inter', sans-serif; }
+.font-mono { font-family: 'JetBrains Mono', monospace; }
+@keyframes foxpulse {
+  0%, 100% { box-shadow: 0 0 22px rgba(7,6,10,0.45), 0 0 70px rgba(7,6,10,0.18), inset 0 0 0 1px rgba(7,6,10,0.55); }
+  50% { box-shadow: 0 0 34px rgba(7,6,10,0.65), 0 0 90px rgba(7,6,10,0.28), inset 0 0 0 1px rgba(20,16,24,0.75); }
+}
+.foxglow { animation: foxpulse 3.2s ease-in-out infinite; }
+`;
+
+const BG_DEEP = "#FF6A00";
+const BG = "#FF7A14";
+const SURFACE = "#FF8A2B";
+const SURFACE_2 = "#FF9A45";
+const NEON = "#07060A";
+const NEON_BRIGHT = "#0D0B12";
+const NEON_SOFT = "#17141F";
+const CREDIT = "#FFC53D";
+const DEBIT = "#FF3B3B";
+const TEXT = "#07060A";
+const MUTED = "#3A2414";
+const LINE = "#07060A";
+const WALLET_PIN = "05062009";
+const CUSTOM_TOPUP_MAX = 100000;
+
+const SEED_PEOPLE = [
+  { id: "p1", type: "person", name: "Fox Bro", tag: "Founder · Fox Den" },
+  { id: "p2", type: "person", name: "Vex Renard", tag: "@vexrenard" },
+  { id: "p3", type: "person", name: "Sable Kade", tag: "@sablekade" },
+];
+const SEED_BIZ = [
+  { id: "b1", type: "business", name: "Fox Talk", tag: "Data Network" },
+  { id: "b2", type: "business", name: "Fox Neon AI", tag: "AI Subscription" },
+  { id: "b3", type: "business", name: "Fox Den Canteen", tag: "Café" },
+];
+
+function makeSerial() {
+  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let s = "FOX-";
+  for (let i = 0; i < 8; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function makeReceiveCode() {
+  const chars = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  let s = "QR-";
+  for (let i = 0; i < 10; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+function fmt(n) {
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+function GridPattern({ id }) {
+  return (
+    <svg width="0" height="0" style={{ position: "absolute" }}>
+      <defs>
+        <pattern id={id} width="22" height="22" patternUnits="userSpaceOnUse">
+          <path d="M22 0H0V22" fill="none" stroke={NEON} strokeWidth="0.5" opacity="0.16" />
+        </pattern>
+      </defs>
+    </svg>
+  );
+}
+
+function FoxPayCredits() {
+  const [loaded, setLoaded] = useState(false);
+  const [balance, setBalance] = useState(560000);
+  const [contacts, setContacts] = useState([...SEED_PEOPLE, ...SEED_BIZ]);
+  const [txns, setTxns] = useState([]);
+  const [tab, setTab] = useState("wallet");
+  const [sendOpen, setSendOpen] = useState(false);
+  const [recipient, setRecipient] = useState(null);
+  const [amount, setAmount] = useState("");
+  const [note, setNote] = useState("");
+  const [addOpen, setAddOpen] = useState(false);
+  const [topUpOpen, setTopUpOpen] = useState(false);
+  const [receiveOpen, setReceiveOpen] = useState(false);
+  const [newName, setNewName] = useState("");
+  const [newType, setNewType] = useState("person");
+  const [toast, setToast] = useState(null);
+  const [customTopUp, setCustomTopUp] = useState("");
+  const [pinValue, setPinValue] = useState("");
+  const [pinError, setPinError] = useState("");
+  const [pinGate, setPinGate] = useState(null);
+  const [receiveFrom, setReceiveFrom] = useState(null);
+  const [receiveAmt, setReceiveAmt] = useState("");
+  const [receiveNote, setReceiveNote] = useState("");
+  const [historyFilter, setHistoryFilter] = useState("all");
+  const [installPrompt, setInstallPrompt] = useState(null);
+  const [installed, setInstalled] = useState(
+    () => window.matchMedia && window.matchMedia("(display-mode: standalone)").matches
+  );
+  const saveTimer = useRef(null);
+  const [serial, setSerial] = useState(() => makeSerial());
+  const [receiveCode, setReceiveCode] = useState(() => makeReceiveCode());
+  const qrPayload = `foxpay://receive?serial=${encodeURIComponent(serial)}&qr=${encodeURIComponent(receiveCode)}`;
+  const qrSrc = `https://api.qrserver.com/v1/create-qr-code/?size=168x168&margin=8&bgcolor=FF6A00&color=07060A&data=${encodeURIComponent(qrPayload)}`;
+
+  useEffect(() => {
+    const onPrompt = (e) => {
+      e.preventDefault();
+      setInstallPrompt(e);
+    };
+    const onInstalled = () => {
+      setInstalled(true);
+      setInstallPrompt(null);
+    };
+    window.addEventListener("beforeinstallprompt", onPrompt);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onPrompt);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
+
+  async function installApp() {
+    if (!installPrompt) {
+      showToast("In Chrome tap ⋮ then Add to Home screen");
+      return;
+    }
+    installPrompt.prompt();
+    const choice = await installPrompt.userChoice;
+    if (choice && choice.outcome === "accepted") {
+      setInstalled(true);
+      showToast("Fox Pay installed");
+    }
+    setInstallPrompt(null);
+  }
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await window.storage.get("foxpay-wallet-state", false);
+        if (res && res.value) {
+          const parsed = JSON.parse(res.value);
+          if (parsed.balance != null) setBalance(parsed.balance);
+          if (parsed.contacts) setContacts(parsed.contacts);
+          if (parsed.txns) setTxns(parsed.txns);
+          if (parsed.serial) setSerial(parsed.serial);
+          if (parsed.receiveCode) setReceiveCode(parsed.receiveCode);
+        }
+      } catch (e) {
+        // no saved state yet
+      }
+      setLoaded(true);
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!loaded) return;
+    clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(async () => {
+      try {
+        await window.storage.set("foxpay-wallet-state", JSON.stringify({
+          balance, contacts, txns, serial, receiveCode,
+        }), false);
+      } catch (e) {
+        // save failed silently; local state still holds the latest values
+      }
+    }, 300);
+  }, [balance, contacts, txns, serial, receiveCode, loaded]);
+
+  function showToast(msg) {
+    setToast(msg);
+    setTimeout(() => setToast(null), 2200);
+  }
+
+  function resetPinEntry() {
+    setPinValue("");
+    setPinError("");
+    setPinGate(null);
+  }
+
+  function withPin(action) {
+    setPinValue("");
+    setPinError("");
+    setPinGate(() => action);
+  }
+
+  function submitPin() {
+    if (pinValue !== WALLET_PIN) {
+      setPinError("Wrong PIN.");
+      return;
+    }
+    const action = pinGate;
+    resetPinEntry();
+    if (typeof action === "function") action();
+  }
+
+  function openSend(person) {
+    setRecipient(person || null);
+    setAmount("");
+    setNote("");
+    resetPinEntry();
+    setSendOpen(true);
+  }
+
+  function confirmSend() {
+    const amt = parseFloat(amount);
+    if (!recipient || !amt || amt <= 0) return;
+    if (amt > balance) {
+      showToast("Insufficient Fox Credits.");
+      return;
+    }
+    withPin(() => {
+      const t = {
+        id: makeSerial(),
+        dir: "out",
+        kind: "send",
+        party: recipient.name,
+        partyType: recipient.type,
+        amount: amt,
+        note: note.trim(),
+        ts: new Date().toISOString(),
+      };
+      setBalance((b) => +(b - amt).toFixed(2));
+      setTxns((list) => [t, ...list]);
+      setSendOpen(false);
+      showToast(`Sent ${fmt(amt)} FC to ${recipient.name}`);
+    });
+  }
+
+  function topUp(amt) {
+    const n = +Number(amt).toFixed(2);
+    if (!n || n <= 0) return;
+    if (n > CUSTOM_TOPUP_MAX) {
+      showToast("Custom top-up max is 1,00,000.00 FC.");
+      return;
+    }
+    withPin(() => {
+      setBalance((b) => +(b + n).toFixed(2));
+      setTxns((list) => [
+        { id: makeSerial(), dir: "in", kind: "topup", party: "Fox Den Treasury", partyType: "business", amount: n, note: n === CUSTOM_TOPUP_MAX ? "Custom top-up" : "Simulated top-up", ts: new Date().toISOString() },
+        ...list,
+      ]);
+      setTopUpOpen(false);
+      setCustomTopUp("");
+      showToast(`Added ${fmt(n)} FC (simulated top-up)`);
+    });
+  }
+
+  const TOP_UP_OPTIONS = [100, 200, 500, 1000, 2000, 5000, 10000, 100000];
+
+  function confirmReceive() {
+    const amt = parseFloat(receiveAmt);
+    if (!receiveFrom || !amt || amt <= 0) return;
+    withPin(() => {
+      const t = {
+        id: makeSerial(),
+        dir: "in",
+        kind: "receive",
+        party: receiveFrom.name,
+        partyType: receiveFrom.type,
+        amount: amt,
+        note: receiveNote.trim() || `Received via ${receiveCode}`,
+        qr: receiveCode,
+        ts: new Date().toISOString(),
+      };
+      setBalance((b) => +(b + amt).toFixed(2));
+      setTxns((list) => [t, ...list]);
+      setReceiveOpen(false);
+      setReceiveFrom(null);
+      setReceiveAmt("");
+      setReceiveNote("");
+      showToast(`Received ${fmt(amt)} FC from ${receiveFrom.name}`);
+    });
+  }
+
+  function addContact() {
+    if (!newName.trim()) return;
+    const c = {
+      id: "c" + Math.random().toString(36).slice(2, 9),
+      type: newType,
+      name: newName.trim(),
+      tag: newType === "person" ? "@" + newName.trim().toLowerCase().replace(/\s+/g, "") : "Business",
+    };
+    setContacts((list) => [...list, c]);
+    setNewName("");
+    setAddOpen(false);
+    showToast(`Added ${c.name} to contacts`);
+  }
+
+  const people = contacts.filter((c) => c.type === "person");
+  const biz = contacts.filter((c) => c.type === "business");
+  const visibleTxns = txns.filter((t) => {
+    if (historyFilter === "in") return t.dir === "in";
+    if (historyFilter === "receive") return t.kind === "receive" || (t.dir === "in" && t.kind !== "topup");
+    return true;
+  });
+
+  function PinFields() {
+    return (
+      <>
+        <div className="font-display font-bold text-xl mb-1" style={{ color: TEXT }}>
+          Enter PIN
+        </div>
+        <div className="font-body text-xs mb-4" style={{ color: MUTED }}>
+          Required for every send, top-up, and receive
+        </div>
+        <label className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>PIN</label>
+        <input
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          value={pinValue}
+          onChange={(e) => {
+            setPinValue(e.target.value.replace(/\D/g, "").slice(0, 8));
+            setPinError("");
+          }}
+          placeholder="••••••••"
+          className="w-full font-mono text-2xl mt-1 mb-4 bg-transparent outline-none"
+          style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+          autoFocus
+        />
+        {pinError && (
+          <div className="font-body text-xs mb-3" style={{ color: DEBIT }}>{pinError}</div>
+        )}
+        <button
+          onClick={submitPin}
+          disabled={pinValue.length < 8}
+          className="w-full py-2.5 rounded-lg font-body text-sm font-semibold disabled:opacity-40"
+          style={{ background: NEON, color: BG_DEEP, boxShadow: `0 0 16px ${NEON}77` }}
+        >
+          Confirm PIN
+        </button>
+      </>
+    );
+  }
+
+  return (
+    <div className="font-body min-h-screen w-full flex justify-center" style={{ background: BG_DEEP }}>
+      <style>{FONT_STYLE}</style>
+      <GridPattern id="foxgrid" />
+      <div
+        className="w-full max-w-md min-h-screen flex flex-col relative"
+        style={{ background: `${BG}`, backgroundImage: `url(#foxgrid)` }}
+      >
+        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ opacity: 1 }}>
+          <rect width="100%" height="100%" fill="url(#foxgrid)" />
+        </svg>
+
+        {/* Header */}
+        <div className="relative px-5 pt-6 pb-3 flex items-center justify-between">
+          <div className="flex items-baseline gap-2">
+            <span
+              className="font-display font-bold text-2xl tracking-tight"
+              style={{ color: NEON, textShadow: `0 0 18px ${NEON}88` }}
+            >
+              FOX PAY
+            </span>
+            <span className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>
+              Credits
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {!installed && (
+              <button
+                onClick={installApp}
+                className="font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded-full"
+                style={{ border: `1px solid ${NEON}`, color: NEON_BRIGHT }}
+              >
+                Install app
+              </button>
+            )}
+            <div className="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest px-2 py-1 rounded-full" style={{ border: `1px solid ${LINE}`, color: MUTED }}>
+              <Crown size={10} color={NEON_SOFT} /> Fox Den
+            </div>
+          </div>
+        </div>
+
+        {/* Balance card */}
+        <div className="relative px-5 mt-2">
+          <div className="foxglow relative rounded-xl overflow-hidden p-5" style={{ background: SURFACE }}>
+            <div className="flex items-start justify-between">
+              <div>
+                <div className="font-mono text-[10px] tracking-[0.2em]" style={{ color: MUTED }}>
+                  SERIAL {serial}
+                </div>
+                <div className="flex items-center gap-1.5 mt-2">
+                  <Cpu size={12} color={NEON_BRIGHT} />
+                  <span className="font-body text-[11px]" style={{ color: NEON_SOFT }}>
+                    Verified by Fox Neon AI
+                  </span>
+                </div>
+              </div>
+              <Zap size={20} color={NEON} style={{ filter: `drop-shadow(0 0 6px ${NEON}aa)` }} />
+            </div>
+
+            <div className="mt-4">
+              <div className="font-mono text-[11px] uppercase tracking-widest" style={{ color: MUTED }}>
+                Available balance
+              </div>
+              <div
+                className="font-display text-4xl font-bold mt-1"
+                style={{ color: TEXT, textShadow: `0 0 22px ${NEON}66` }}
+              >
+                {fmt(balance)} <span style={{ color: NEON_BRIGHT, fontSize: "0.5em" }}>FC</span>
+              </div>
+              <div className="font-body text-xs mt-1" style={{ color: MUTED }}>
+                Fox Credits — imaginary currency, not real money
+              </div>
+            </div>
+
+            <div className="flex gap-2 mt-5">
+              <button
+                onClick={() => openSend(null)}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg font-body text-sm font-semibold"
+                style={{ background: NEON, color: BG_DEEP, boxShadow: `0 0 16px ${NEON}77` }}
+              >
+                <Send size={14} /> Send
+              </button>
+              <button
+                onClick={() => { setCustomTopUp(""); resetPinEntry(); setTopUpOpen(true); }}
+                className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg font-body text-sm font-semibold"
+                style={{ border: `1px solid ${NEON}`, color: NEON_BRIGHT }}
+              >
+                <Plus size={14} /> Top up
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tabs */}
+        <div className="relative flex px-5 mt-6 gap-5" style={{ borderBottom: `1px solid ${LINE}` }}>
+          {[
+            { id: "wallet", label: "Pay someone", icon: Users },
+            { id: "history", label: "Activity", icon: History },
+          ].map((t) => (
+            <button
+              key={t.id}
+              onClick={() => setTab(t.id)}
+              className="flex items-center gap-1.5 pb-2.5 font-body text-sm"
+              style={{
+                color: tab === t.id ? NEON_BRIGHT : MUTED,
+                borderBottom: tab === t.id ? `2px solid ${NEON}` : "2px solid transparent",
+              }}
+            >
+              <t.icon size={14} /> {t.label}
+            </button>
+          ))}
+        </div>
+
+        {/* Content */}
+        <div className="relative flex-1 px-5 py-4 overflow-y-auto">
+          {tab === "wallet" && (
+            <div className="space-y-5">
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 font-mono text-[11px] uppercase tracking-widest" style={{ color: NEON_BRIGHT }}>
+                  <QrIcon size={12} /> Receive
+                </div>
+                <div
+                  className="flex items-center justify-between py-2 px-3 rounded-lg"
+                  style={{ background: SURFACE, border: `1px solid ${LINE}` }}
+                >
+                  <div className="flex items-center gap-2">
+                    <QrIcon size={13} color={NEON_SOFT} />
+                    <div>
+                      <div className="font-body text-sm" style={{ color: TEXT }}>Your unique QR</div>
+                      <div className="font-mono text-[10px]" style={{ color: MUTED }}>{receiveCode}</div>
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => {
+                      setReceiveFrom(null);
+                      setReceiveAmt("");
+                      setReceiveNote("");
+                      resetPinEntry();
+                      setReceiveOpen(true);
+                    }}
+                    className="font-body text-xs px-3 py-1.5 rounded-md"
+                    style={{ border: `1px solid ${NEON}`, color: NEON_BRIGHT }}
+                  >
+                    Receive
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 font-mono text-[11px] uppercase tracking-widest" style={{ color: NEON_BRIGHT }}>
+                  <Users size={12} /> People
+                </div>
+                <div className="space-y-1.5">
+                  {people.map((p) => (
+                    <ContactRow key={p.id} c={p} onPay={() => openSend(p)} founder={p.name === "Fox Bro"} />
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <div className="flex items-center gap-1.5 mb-2 font-mono text-[11px] uppercase tracking-widest" style={{ color: NEON_BRIGHT }}>
+                  <Building2 size={12} /> Businesses
+                </div>
+                <div className="space-y-1.5">
+                  {biz.map((b) => (
+                    <ContactRow key={b.id} c={b} onPay={() => openSend(b)} network={b.name === "Fox Talk"} ai={b.name === "Fox Neon AI"} />
+                  ))}
+                </div>
+              </div>
+
+              <button
+                onClick={() => setAddOpen(true)}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-lg font-body text-sm mt-2"
+                style={{ border: `1px dashed ${NEON}66`, color: NEON_SOFT }}
+              >
+                <Plus size={14} /> Add imaginary contact
+              </button>
+            </div>
+          )}
+
+          {tab === "history" && (
+            <div className="space-y-2">
+              <div className="flex gap-2 mb-1">
+                {[
+                  { id: "all", label: "All" },
+                  { id: "in", label: "In" },
+                  { id: "receive", label: "Received" },
+                ].map((f) => (
+                  <button
+                    key={f.id}
+                    onClick={() => setHistoryFilter(f.id)}
+                    className="font-mono text-[10px] uppercase tracking-widest px-2 py-1 rounded-full"
+                    style={{
+                      border: `1px solid ${historyFilter === f.id ? NEON : LINE}`,
+                      color: historyFilter === f.id ? NEON_BRIGHT : MUTED,
+                    }}
+                  >
+                    {f.label}
+                  </button>
+                ))}
+              </div>
+              {visibleTxns.length === 0 && (
+                <div className="text-center py-10 font-body text-sm" style={{ color: MUTED }}>
+                  {historyFilter === "all" ? "No activity yet. Send your first Fox Credit." : "No receive history yet."}
+                </div>
+              )}
+              {visibleTxns.map((t) => (
+                <div key={t.id} className="flex items-center justify-between py-2.5" style={{ borderBottom: `1px solid ${LINE}` }}>
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-8 h-8 rounded-full flex items-center justify-center shrink-0"
+                      style={{ background: t.dir === "out" ? `${DEBIT}22` : `${CREDIT}22` }}
+                    >
+                      {t.dir === "out" ? (
+                        <ArrowUpRight size={14} color={DEBIT} />
+                      ) : (
+                        <ArrowDownLeft size={14} color={CREDIT} />
+                      )}
+                    </div>
+                    <div>
+                      <div className="font-body text-sm" style={{ color: TEXT }}>{t.party}</div>
+                      <div className="font-mono text-[10px]" style={{ color: MUTED }}>
+                        {t.id} · {new Date(t.ts).toLocaleString("en-IN", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit" })}
+                      </div>
+                      {t.kind === "receive" && (
+                        <div className="font-mono text-[10px]" style={{ color: NEON_SOFT }}>
+                          QR {t.qr || receiveCode}
+                        </div>
+                      )}
+                      {t.note && <div className="font-body text-[11px] italic mt-0.5" style={{ color: MUTED }}>“{t.note}”</div>}
+                    </div>
+                  </div>
+                  <div className="font-mono text-sm font-semibold" style={{ color: t.dir === "out" ? DEBIT : CREDIT }}>
+                    {t.dir === "out" ? "-" : "+"}{fmt(t.amount)} FC
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+      </div>
+
+      {/* Send modal */}
+      {sendOpen && (
+        <Modal onClose={() => { setSendOpen(false); resetPinEntry(); }}>
+          {pinGate ? (
+            <PinFields />
+          ) : (
+            <>
+              <div className="font-display font-bold text-xl mb-4" style={{ color: TEXT }}>
+                Send Fox Credits
+              </div>
+
+              {!recipient ? (
+                <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                  {[...people, ...biz].map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setRecipient(c)}
+                      className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg"
+                      style={{ border: `1px solid ${LINE}`, background: SURFACE_2 }}
+                    >
+                      <div className="text-left">
+                        <div className="font-body text-sm" style={{ color: TEXT }}>{c.name}</div>
+                        <div className="font-mono text-[10px]" style={{ color: MUTED }}>{c.tag}</div>
+                      </div>
+                      <ChevronRight size={14} color={NEON_BRIGHT} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg mb-4" style={{ background: `${NEON}1a`, border: `1px solid ${NEON}55` }}>
+                    <span className="font-body text-sm" style={{ color: TEXT }}>To: {recipient.name}</span>
+                    <button onClick={() => setRecipient(null)} className="font-body text-xs underline" style={{ color: NEON_SOFT }}>change</button>
+                  </div>
+
+                  <label className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Amount (FC)</label>
+                  <input
+                    type="number"
+                    value={amount}
+                    onChange={(e) => setAmount(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full font-mono text-2xl mt-1 mb-4 bg-transparent outline-none"
+                    style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+                    autoFocus
+                  />
+
+                  <label className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Note (optional)</label>
+                  <input
+                    type="text"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    placeholder="What's this for?"
+                    className="w-full font-body text-sm mt-1 mb-5 bg-transparent outline-none py-1.5"
+                    style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+                  />
+
+                  <button
+                    onClick={confirmSend}
+                    disabled={!amount || parseFloat(amount) <= 0}
+                    className="w-full py-2.5 rounded-lg font-body text-sm font-semibold disabled:opacity-40"
+                    style={{ background: NEON, color: BG_DEEP, boxShadow: `0 0 16px ${NEON}77` }}
+                  >
+                    Confirm & send
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
+
+      {/* Top-up choices modal */}
+      {topUpOpen && (
+        <Modal onClose={() => { setTopUpOpen(false); resetPinEntry(); }}>
+          {pinGate ? (
+            <PinFields />
+          ) : (
+            <>
+              <div className="font-display font-bold text-xl mb-1" style={{ color: TEXT }}>
+                Top up Fox Credits
+              </div>
+              <div className="font-body text-xs mb-4" style={{ color: MUTED }}>
+                Choose a simulated credit amount
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                {TOP_UP_OPTIONS.map((amt, index) => (
+                  <button
+                    key={amt}
+                    onClick={() => topUp(amt)}
+                    className="flex items-center justify-between px-3 py-3 rounded-lg font-body text-sm font-semibold"
+                    style={{
+                      background: SURFACE_2,
+                      border: `1px solid ${LINE}`,
+                      color: TEXT,
+                    }}
+                  >
+                    <span className="font-mono text-[10px]" style={{ color: NEON_SOFT }}>
+                      {index + 1})
+                    </span>
+                    <span className="font-mono" style={{ color: NEON_BRIGHT }}>
+                      +{fmt(amt)} FC
+                    </span>
+                  </button>
+                ))}
+              </div>
+
+              <label className="font-mono text-[10px] uppercase tracking-widest mt-4 block" style={{ color: MUTED }}>Custom top-up (max 1,00,000.00)</label>
+              <input
+                type="number"
+                value={customTopUp}
+                onChange={(e) => setCustomTopUp(e.target.value)}
+                placeholder="100000"
+                className="w-full font-mono text-2xl mt-1 mb-4 bg-transparent outline-none"
+                style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+              />
+              <button
+                onClick={() => topUp(parseFloat(customTopUp))}
+                disabled={!customTopUp || parseFloat(customTopUp) <= 0}
+                className="w-full py-2.5 rounded-lg font-body text-sm font-semibold disabled:opacity-40"
+                style={{ background: NEON, color: BG_DEEP, boxShadow: `0 0 16px ${NEON}77` }}
+              >
+                Add custom top-up
+              </button>
+
+              <div className="font-body text-[10px] mt-4 text-center" style={{ color: MUTED }}>
+                Fox Credits are imaginary currency — no real money involved.
+              </div>
+            </>
+          )}
+        </Modal>
+      )}
+
+      {/* Receive modal */}
+      {receiveOpen && (
+        <Modal onClose={() => { setReceiveOpen(false); resetPinEntry(); }}>
+          {pinGate ? (
+            <PinFields />
+          ) : (
+            <>
+              <div className="font-display font-bold text-xl mb-1" style={{ color: TEXT }}>
+                Receive Fox Credits
+              </div>
+              <div className="font-body text-xs mb-4" style={{ color: MUTED }}>
+                Unique QR for this wallet
+              </div>
+
+              <div className="flex flex-col items-center mb-4">
+                <div className="p-2 rounded-lg" style={{ background: SURFACE_2, border: `1px solid ${LINE}` }}>
+                  <img src={qrSrc} width="168" height="168" alt="Unique Fox Pay QR" style={{ display: "block" }} />
+                </div>
+                <div className="font-mono text-[10px] mt-2 tracking-widest" style={{ color: MUTED }}>
+                  {serial}
+                </div>
+                <div className="font-mono text-[11px]" style={{ color: NEON_BRIGHT }}>
+                  {receiveCode}
+                </div>
+              </div>
+
+              {!receiveFrom ? (
+                <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                  <div className="font-mono text-[10px] uppercase tracking-widest mb-1" style={{ color: MUTED }}>Receive from</div>
+                  {[...people, ...biz].map((c) => (
+                    <button
+                      key={c.id}
+                      onClick={() => setReceiveFrom(c)}
+                      className="w-full flex items-center justify-between py-2.5 px-3 rounded-lg"
+                      style={{ border: `1px solid ${LINE}`, background: SURFACE_2 }}
+                    >
+                      <div className="text-left">
+                        <div className="font-body text-sm" style={{ color: TEXT }}>{c.name}</div>
+                        <div className="font-mono text-[10px]" style={{ color: MUTED }}>{c.tag}</div>
+                      </div>
+                      <ChevronRight size={14} color={NEON_BRIGHT} />
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center justify-between py-2 px-3 rounded-lg mb-4" style={{ background: `${NEON}1a`, border: `1px solid ${NEON}55` }}>
+                    <span className="font-body text-sm" style={{ color: TEXT }}>From: {receiveFrom.name}</span>
+                    <button onClick={() => setReceiveFrom(null)} className="font-body text-xs underline" style={{ color: NEON_SOFT }}>change</button>
+                  </div>
+
+                  <label className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Amount (FC)</label>
+                  <input
+                    type="number"
+                    value={receiveAmt}
+                    onChange={(e) => setReceiveAmt(e.target.value)}
+                    placeholder="0.00"
+                    className="w-full font-mono text-2xl mt-1 mb-4 bg-transparent outline-none"
+                    style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+                    autoFocus
+                  />
+
+                  <label className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Note (optional)</label>
+                  <input
+                    type="text"
+                    value={receiveNote}
+                    onChange={(e) => setReceiveNote(e.target.value)}
+                    placeholder="What's this for?"
+                    className="w-full font-body text-sm mt-1 mb-5 bg-transparent outline-none py-1.5"
+                    style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+                  />
+
+                  <button
+                    onClick={confirmReceive}
+                    disabled={!receiveAmt || parseFloat(receiveAmt) <= 0}
+                    className="w-full py-2.5 rounded-lg font-body text-sm font-semibold disabled:opacity-40"
+                    style={{ background: NEON, color: BG_DEEP, boxShadow: `0 0 16px ${NEON}77` }}
+                  >
+                    Confirm & receive
+                  </button>
+                </>
+              )}
+            </>
+          )}
+        </Modal>
+      )}
+
+      {/* Add contact modal */}
+      {addOpen && (
+        <Modal onClose={() => setAddOpen(false)}>
+          <div className="font-display font-bold text-xl mb-4" style={{ color: TEXT }}>
+            New imaginary contact
+          </div>
+          <div className="flex gap-2 mb-4">
+            {["person", "business"].map((ty) => (
+              <button
+                key={ty}
+                onClick={() => setNewType(ty)}
+                className="flex-1 py-2 rounded-lg font-body text-sm capitalize"
+                style={{
+                  background: newType === ty ? NEON : "transparent",
+                  color: newType === ty ? BG_DEEP : TEXT,
+                  border: `1px solid ${NEON}`,
+                }}
+              >
+                {ty}
+              </button>
+            ))}
+          </div>
+          <label className="font-mono text-[10px] uppercase tracking-widest" style={{ color: MUTED }}>Name</label>
+          <input
+            type="text"
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={newType === "person" ? "e.g. Kit Vulpine" : "e.g. Ember & Co."}
+            className="w-full font-body text-base mt-1 mb-5 bg-transparent outline-none py-1.5"
+            style={{ color: TEXT, borderBottom: `1px solid ${LINE}` }}
+            autoFocus
+          />
+          <button
+            onClick={addContact}
+            disabled={!newName.trim()}
+            className="w-full py-2.5 rounded-lg font-body text-sm font-semibold disabled:opacity-40"
+            style={{ background: NEON, color: BG_DEEP, boxShadow: `0 0 16px ${NEON}77` }}
+          >
+            Add contact
+          </button>
+        </Modal>
+      )}
+
+      {/* Toast */}
+      {toast && (
+        <div
+          className="fixed bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg font-body text-sm"
+          style={{ background: SURFACE, color: TEXT, border: `1px solid ${NEON}`, boxShadow: `0 0 18px ${NEON}55` }}
+        >
+          {toast}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ContactRow({ c, onPay, founder, network, ai }) {
+  return (
+    <div className="flex items-center justify-between py-2 px-3 rounded-lg" style={{ background: SURFACE, border: `1px solid ${LINE}` }}>
+      <div className="flex items-center gap-2">
+        {founder && <Crown size={13} color={NEON_SOFT} />}
+        {network && <Radio size={13} color={NEON_SOFT} />}
+        {ai && <Cpu size={13} color={NEON_SOFT} />}
+        <div>
+          <div className="font-body text-sm" style={{ color: TEXT }}>{c.name}</div>
+          <div className="font-mono text-[10px]" style={{ color: MUTED }}>{c.tag}</div>
+        </div>
+      </div>
+      <button
+        onClick={onPay}
+        className="font-body text-xs px-3 py-1.5 rounded-md"
+        style={{ border: `1px solid ${NEON}`, color: NEON_BRIGHT }}
+      >
+        Pay
+      </button>
+    </div>
+  );
+}
+
+/* Note: the source file supplied to build this page cut off mid-definition of
+   Modal (it ended at `onCli`). Completed here in the same style as the rest
+   of the component: a bottom-sheet / centered overlay that closes on
+   backdrop click, with an explicit close (X) button. */
+function Modal({ children, onClose }) {
+  return (
+    <div
+      className="fixed inset-0 flex items-end sm:items-center justify-center z-50"
+      style={{ background: "rgba(255,106,0,0.55)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-md rounded-t-2xl sm:rounded-2xl p-5 relative"
+        style={{ background: SURFACE, border: `1px solid ${LINE}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <button
+          onClick={onClose}
+          className="absolute top-4 right-4"
+          style={{ color: MUTED }}
+        >
+          <X size={18} />
+        </button>
+        {children}
+      </div>
+    </div>
+  );
+}
+
+const root = ReactDOM.createRoot(document.getElementById("root"));
+root.render(<FoxPayCredits />);
+
+</script>
+</body>
+</html>
